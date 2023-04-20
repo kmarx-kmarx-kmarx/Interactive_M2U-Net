@@ -9,7 +9,7 @@ import os
 def main():
     data_source = 'newdata'
     data_save = 'result'
-    model_pth = 'rbc_m2unet_model_greyscale'
+    model_pth = 'rbc_m2unet_model_greyscale/model_70_11.pth'
     os.makedirs(data_save, exist_ok=True)
     # Load images into np array
     img_paths = glob.glob(data_source + '/**_DPC.bmp', recursive=True)
