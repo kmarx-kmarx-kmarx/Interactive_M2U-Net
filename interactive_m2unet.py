@@ -532,6 +532,11 @@ class M2UnetInteractiveModel:
         self.model_config = self._config["model_config"]
         self.init_model(self.model_config)
         self.model.load_state_dict(torch.load(file_path, map_location=self.device))
-
+    
+    def parameters(self):
+        return self.model.parameters()
+    def named_parameters(self):
+        return self.model.named_parameters()
+    
     def finalize(self):
         self.model = None

@@ -8,8 +8,8 @@ import os
 
 def main():
     data_source = 'newdata'
-    data_save = 'result'
-    model_pth = 'rbc_m2unet_model_greyscale/model_70_11.pth'
+    data_save = 'result_wdecay'
+    model_pth = 'model_wdecay5/model_97_13.pth'
     os.makedirs(data_save, exist_ok=True)
     # Load images into np array
     img_paths = glob.glob(data_source + '/**_DPC.bmp', recursive=True)

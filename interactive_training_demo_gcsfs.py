@@ -17,12 +17,12 @@ def main():
     n_epochs = 10000
     sz = 1024
     center_blank = 400
-    imag_dir = ''
-    mask_dir = ''
-    exp_id   = []
-    key = ''
-    gcs_project = ''
-    flr_correct = ''
+    imag_dir = 'gs://octopi-tb-data/20221002'
+    mask_dir = 'gs://octopi-tb-data-processing/20230301'
+    exp_id   = ['SP1+_2022-10-02_20-10-50.529345', 'SP2+_2022-10-02_20-41-41.247131', 'SP3+_2022-10-02_21-13-35.929780', 'SP4+_2022-10-02_21-47-12.117750', 'SP5+_2022-10-02_22-16-53.962897']
+    key = '/home/prakashlab/Documents/kmarx/tb_key.json'
+    gcs_project = 'soe-octopi'
+    flr_correct = '/home/prakashlab/Documents/kmarx/tb_segment/pipeline/illumination correction/flatfield_fluorescence.npy'
     flatfield_fluorescence = np.load(flr_correct)
     fs = gcsfs.GCSFileSystem(project=gcs_project,token=key)
     erode_mask = 0
