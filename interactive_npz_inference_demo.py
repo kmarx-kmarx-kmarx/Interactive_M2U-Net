@@ -8,8 +8,8 @@ import os
 
 def main():
     data_source = '/home/prakashlab/Documents/kmarx/train_m2unet_cellpose_cloud/data_sbc_validation'
-    data_save = 'result_wdecay6'
-    model_pth = 'model_wdecay6/model_22_10.pth'
+    data_save = 'result_wd5_new'
+    model_pth = 'model_wdecay5/model_254_11.pth'
     os.makedirs(data_save, exist_ok=True)
     # Load images into np array
     img_paths = glob.glob(data_source+'/**.npz', recursive=True)
@@ -22,6 +22,7 @@ def main():
             img = np.load(img_path)
             mask = img["mask"]
             img = img["img"]
+            # img = (img - np.mean(img))/np.std(img)
             img = np.expand_dims(img, 0)
             imgs.append(img)
             masks.append(mask)
@@ -41,6 +42,7 @@ def main():
 
     for i, result in enumerate(outs):
         result = result[:,:,0]
+        # print((np.min(result), np.max(result)))
         pred_mask = np.zeros(result.shape).astype(np.uint8)
         pred_mask[result > 0.5] = 255
 
@@ -50,8 +52,8 @@ def main():
         color_diff = np.zeros((result.shape[0], result.shape[1], 3))
         color_diff[:,:,0] = (255 * (diff < 0)).astype(np.uint8)
         color_diff[:,:,2] = (255 * (diff > 0)).astype(np.uint8)
-        # cv2.imwrite(os.path.join(data_save, str(i) + "_im.png"), imgs[i,0,:,:])
-        cv2.imwrite(os.path.join(data_save, str(i) + "_probs.png"), probs)
+        cv2.imwrite(os.path.join(data_save, str(i) + "_im.png"), predict_images[i,0,:,:])
+        # cv2.imwrite(os.path.join(data_save, str(i) + "_probs.png"), probs)
         cv2.imwrite(os.path.join(data_save, str(i) + "_pred_mask.png"), pred_mask)
         cv2.imwrite(os.path.join(data_save, str(i) + "_diff.png"), color_diff)
         cv2.imwrite(os.path.join(data_save, str(i) + "_mask.png"), masks[i])

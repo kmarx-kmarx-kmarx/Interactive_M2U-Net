@@ -3,7 +3,7 @@ import json
 import numpy as np
 import albumentations as A
 from m2unet import m2unet
-from tqdm import tqdm
+import torch2trt
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -19,6 +19,7 @@ class M2UnetInteractiveModel:
         save_intermediate = True, # Set False to overwrite, set True to keep 
         save_if_lower = True,     # Set True to save if validation loss is lower than what was previously seen
         use_gpu=True,             # Use GPU for training and inferece
+        use_trt=False,            # Set False for Torch, True for trt
         target_sz=16,             # Image height/width will be set to a multiple of target_sz
         run_width=1024,           # Image width for training/inference, limited by GPU RAM
         run_height=1024,          # Image height for training/inference, limited by GPU RAM
@@ -47,6 +48,7 @@ class M2UnetInteractiveModel:
         run_height -= run_height % target_sz
         self.run_width=run_width
         self.run_height=run_height
+        self.use_trt=use_trt
         # initialize device
         gpu = torch.cuda.is_available()
         if use_gpu and gpu:
@@ -97,7 +99,10 @@ class M2UnetInteractiveModel:
         del model_kwargs["type"]
         del model_kwargs["optimizer"]
         del model_kwargs["augmentation"]
-        self.model = m2unet(**model_kwargs).to(self.device)
+        if self.use_trt == False:
+            self.model = m2unet(**model_kwargs).to(self.device)
+        else:
+            self.model = torch2trt.TRTModule()
         self.model_config = model_config
         self.transform = augmentation_config and A.from_dict(augmentation_config)
         loss_class = getattr(nn, self.model_config["loss"]["name"])
@@ -109,7 +114,10 @@ class M2UnetInteractiveModel:
             if "kwargs" in self.model_config["loss"]
             else loss_class
         )
-        self.optimizer = optimizer_class(self.model.parameters(), **self.model_config["optimizer"]["kwargs"])
+        if self.use_trt:
+            self.optimizer = None
+        else:
+            self.optimizer = optimizer_class(self.model.parameters(), **self.model_config["optimizer"]["kwargs"])
         self.criterion = loss_instance
 
     def crop_ims_to_size(self, images):
@@ -182,6 +190,7 @@ class M2UnetInteractiveModel:
         ------------------
         train_loss: an array of loss during training
         """
+        assert self.use_trt == False, "must use torch for training"
         imgi, tgs = self.augment(images, targets)
         imgi = self.crop_ims_to_size(imgi)
         tgs = self.crop_ims_to_size(tgs)
@@ -411,7 +420,7 @@ class M2UnetInteractiveModel:
     
     def predict(self, X, **kwargs):
         """predict the model for one input image
-           not that width and height must be multiples of 16
+           note that width and height must be multiples of 16
         Parameters
         --------------
         X: array [batch_size, channel, width, height]
@@ -456,11 +465,20 @@ class M2UnetInteractiveModel:
         return predictions
     
     def predict_on_images(self, predict_images):
+        initial_dims = predict_images.ndims
+        if initial_dims == 3:
+            np.expand_dims(predict_images, 0)
+        assert predict_images.ndims == 4
+
         image_stack, *im_params = self.reshape_images_stack(predict_images)
         # Get predictions 
         preds = self.predict_on_slices(image_stack)
         # reshape
         image_preds = self.reshape_stack_images(preds, *im_params)
+
+        if initial_dims == 3:
+            image_preds = image_preds[0,:,:,:]
+
         return image_preds
     
     def validate(self, validate_images, validate_targets):
@@ -508,6 +526,7 @@ class M2UnetInteractiveModel:
         ------------------
         None
         """
+        assert self.use_trt == False, "can only save if torch"
         if file_path is None:
             file_path = os.path.join(self.model_dir, self.model_name)
         assert isinstance(file_path, str)
@@ -531,7 +550,19 @@ class M2UnetInteractiveModel:
         self.type = self._config["model_config"]["type"]
         self.model_config = self._config["model_config"]
         self.init_model(self.model_config)
+
         self.model.load_state_dict(torch.load(file_path, map_location=self.device))
+        return
+
+    def make_trt(self):
+        '''
+        Convert the given Torch model into TRT
+        '''
+        assert self.use_trt == False, "can't convert trt to trt"
+
+        data = torch.randn(self.batch_sz, n_channels, self.run_width, self.run_height).to(self.device)
+        model_trt = torch2trt.torch2trt(self.model)
+        torch.seave(model_trt.state_dict(), savepath)
     
     def parameters(self):
         return self.model.parameters()
