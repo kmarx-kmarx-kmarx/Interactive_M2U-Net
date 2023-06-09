@@ -465,10 +465,10 @@ class M2UnetInteractiveModel:
         return predictions
     
     def predict_on_images(self, predict_images):
-        initial_dims = predict_images.ndims
+        initial_dims = predict_images.ndim
         if initial_dims == 3:
             np.expand_dims(predict_images, 0)
-        assert predict_images.ndims == 4
+        assert predict_images.ndim == 4
 
         image_stack, *im_params = self.reshape_images_stack(predict_images)
         # Get predictions 
