@@ -244,7 +244,7 @@ class M2UnetInteractiveModel:
         valid_loss = self.criterion(masks_pred, tgs)
         return valid_loss.item(), masks_pred.cpu().detach().numpy()
     
-    def reshape_images_stack(self, images):
+    def reshape_images_stack(self, images_in):
         ''' convert from [num_images, channel, width, height] to 
         [n_slices, channel, new_width, new_height]
         with overlap between slices. 
@@ -261,7 +261,16 @@ class M2UnetInteractiveModel:
             a batch of input images where run_width, run_height are multiples of target_sz and are small enough to run
         nx, ny, dx, dy, im_w, im_h: integers for reconstructiong the original images
         '''
-        n_im, im_c, im_w, im_h = images.shape
+        n_im, im_c, im_w, im_h = images_in.shape
+
+        # handle case where run_width or run_height are larger than the image - pad with 0
+        if im_w < self.run_width or im_h < self.run_height:
+            images = np.zeros((n_im, im_c, np.max(im_w, self.run_width), np.max(im_h, self.run_height)))
+            wstart = int(np.floor(np.max(0, (self.run_width - im_w))/2))
+            hstart = int(np.floor(np.max(0, (self.run_height - im_h))/2))
+            images[:,:,wstart:wstart+im_w, hstart:hstart+im_h] = images_in
+        else:
+            images = images_in
 
         nx = int(np.ceil((im_w-self.overlap)/(self.run_width-self.overlap)))
         ny = int(np.ceil((im_h-self.overlap)/(self.run_height-self.overlap)))
@@ -314,7 +323,7 @@ class M2UnetInteractiveModel:
             a stack of masks
         '''
         # print((image_stack.shape, nx, ny, dx, dy, im_w, im_h, n_im))
-        output = np.zeros((n_im, image_stack.shape[1], im_w, im_h))
+        output = np.zeros((n_im, image_stack.shape[1], np.max(im_w, self.run_width), np.max(im_h, self.run_height)))
         d = int(self.overlap/2)
 
         for i in range(len(image_stack)):
@@ -381,6 +390,11 @@ class M2UnetInteractiveModel:
             # print(f"stack:  {image_stack[i, :, x_0m:x_1m, y_0m:y_1m].shape}")
             output[z, :, x_0:x_1, y_0:y_1] = image_stack[i, :, x_0m:x_1m, y_0m:y_1m]
 
+            # if run length is too long, crop edges.
+            if self.run_height > im_h or self.run_width > im_w:
+                wstart = int(np.floor(np.max(0, (self.run_width - im_w))/2))
+                hstart = int(np.floor(np.max(0, (self.run_height - im_h))/2))
+                output = output[:,:,wstart:wstart+im_w, hstart:hstart+im_h]
         return output
 
     def train_on_stack(self, train_images, train_targets):
